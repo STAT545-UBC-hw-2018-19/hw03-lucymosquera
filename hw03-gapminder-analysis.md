@@ -10,6 +10,16 @@ Homework 3
     -   [Load Packages](#load-packages)
 -   [Get the maximum and minimum of GDP per capita for all continents.](#get-the-maximum-and-minimum-of-gdp-per-capita-for-all-continents)
 -   [Computing Alternative Mean Life Expectancy](#computing-alternative-mean-life-expectancy)
+    -   [Mean Life Expectancy by Country](#mean-life-expectancy-by-country)
+    -   [Weighted Mean Life Expectancy by Continent](#weighted-mean-life-expectancy-by-continent)
+    -   [Trimmed mean life by year that removes the top 5% and bottom 5% values within a continent](#trimmed-mean-life-by-year-that-removes-the-top-5-percent-and-bottom-5-percent-values-within-a-continent)
+-   [Report Countries With Low Life Expectancy Over Time by Continent](#report-countries-with-low-life-expectancy-over-time-by-continent)
+    -   [Countries with Life Expectancies Lower than 65 Years](#countries-with-life-expectancies-lower-than-65-years)
+    -   [Countries with Life Expectancies Below the Annual Median](#countries-with-life-expectancies-below-the-annual-median)
+-   [How is Oceania Doing?](#how-is-oceania-doing)
+    -   [Initial Plots](#initial-plots)
+    -   [Life Expectancy and GDP per Capita](#life-expectancy-and-gdp-per-capita)
+    -   [Relative GDP Contributions](#relative-gdp-contributions)
 
 Introduction
 ============
@@ -24,6 +34,8 @@ library(tidyverse)
 library(knitr)
 library(gridExtra)
 library(gapminder)
+#Set ggplot titles to be centred
+theme_update(plot.title = element_text(hjust = 0.5))
 ```
 
 Get the maximum and minimum of GDP per capita for all continents
@@ -33,8 +45,8 @@ Get the maximum and minimum of GDP per capita for all continents
 gapminder %>% 
   group_by(continent) %>% 
   summarize(minGDPperCap = min(gdpPercap),
-            maxGDPperCap = max(gdpPercap)) %>% 
-  mutate(rangeGDPperCap = maxGDPperCap - minGDPperCap) %>% 
+            maxGDPperCap = max(gdpPercap),
+            rangeGDPperCap = maxGDPperCap - minGDPperCap) %>% 
   knitr::kable()
 ```
 
@@ -52,7 +64,7 @@ To better visualize the spread of the data, we can see:
 
 ``` r
 #Building the below violin plot with jittered points added
-minMaxGDPPlot <- ggplot(gapminder, aes(continent, gdpPercap, colour=year)) +
+minMaxGDPPlot <- ggplot(gapminder, aes(continent, gdpPercap, colour = year)) +
   scale_y_log10() +
   geom_violin() + 
   geom_jitter(alpha=0.5)
@@ -61,11 +73,11 @@ minMaxGDPPlot <- ggplot(gapminder, aes(continent, gdpPercap, colour=year)) +
 minMaxGDPTable <- gapminder %>% 
   group_by(continent) %>% 
   summarize(minGDPperCap = round(min(gdpPercap), 1),
-            maxGDPperCap = round(max(gdpPercap), 1)) %>% 
-  mutate(rangeGDPperCap = maxGDPperCap - minGDPperCap)
+            maxGDPperCap = round(max(gdpPercap), 1),
+            rangeGDPperCap = maxGDPperCap - minGDPperCap)
 
 # Set theme to customize sizing of the table
-tt <- ttheme_default(colhead=list(fg_params = list(parse=TRUE)), 
+tt <- ttheme_default(colhead=list(fg_params = list(parse = TRUE)), 
                      core = list(fg_params=list(cex = 0.75)),
                      colhead = list(fg_params=list(cex = 0.25)),
                      rowhead = list(fg_params=list(cex = 0.25)))
@@ -78,12 +90,17 @@ minMaxGDPTableGrob <- tableGrob(minMaxGDPTable[,c(1:3)],
 # Plot chart and table into one object
 grid.arrange(minMaxGDPTableGrob, minMaxGDPPlot,  
              nrow=2, ncol=4,
-             layout_matrix = rbind(c(1,rep(2,3)), c(1,rep(2,3))),
+             layout_matrix = rbind(c(1, rep(2,3)), c(1, rep(2,3))),
              as.table=TRUE,
              top = "GDP per Capita by Continent")
 ```
 
 ![](hw03-gapminder-analysis_files/figure-markdown_github/maxMinGDPPlot-1.png)
+
+This helps us see:
+
+-   Contrasting shapes of violin plots: Africa and the Americas are widest in the lower half, while Europe is widest in the upper half of the distribution of GDP values
+-   The minimum and maximum values for each continent are not far away from the rest of the data points. This implies that the min and max values are unlikely to be outliers, even if they may be from outlier countries or outlier years
 
 Computing Alternative Mean Life Expectancy
 ==========================================
@@ -94,7 +111,7 @@ Let's try three different ways to calculate average life expectancy:
 
 -   Mean life expectancy by country, regardless of year
 -   Weighted mean that weights life expectancy by population in 1952 and 2007
--   Trimmed mean life by year that removes the top 5% and bottom 5% values
+-   Trimmed mean life by year that removes the top 5% and bottom 5% values within a continent
 
 Mean Life Expectancy by Country
 -------------------------------
@@ -251,168 +268,27 @@ gapminder %>%
 | Zambia                   |     45.99633|
 | Zimbabwe                 |     52.66317|
 
-Weighted Mean Life Expectancy
------------------------------
-
-By Country:
+Let's try and visualize these values better:
 
 ``` r
 gapminder %>% 
-  mutate(weightedLifeExp = lifeExp * pop) %>% 
-  group_by(country) %>% 
-  summarize(MeanWeightedLifeExp = (sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))) %>% 
-  kable()
+  group_by(country, continent) %>% 
+  summarize(meanLifeExp = mean(lifeExp)) %>% 
+  ggplot(aes(meanLifeExp)) +
+    geom_histogram(aes(fill = continent), binwidth = 2.5) +
+    ggtitle("Distribution of Country's Mean Life Expectancy by Continent")
 ```
 
-| country                  |  MeanWeightedLifeExp|
-|:-------------------------|--------------------:|
-| Afghanistan              |             39.17119|
-| Albania                  |             70.21007|
-| Algeria                  |             63.05490|
-| Angola                   |             39.02700|
-| Argentina                |             70.07024|
-| Australia                |             75.66749|
-| Austria                  |             73.32872|
-| Bahrain                  |             69.81501|
-| Bangladesh               |             52.98928|
-| Belgium                  |             73.81851|
-| Benin                    |             51.42856|
-| Bolivia                  |             55.56364|
-| Bosnia and Herzegovina   |             68.49818|
-| Botswana                 |             54.80124|
-| Brazil                   |             64.64616|
-| Bulgaria                 |             69.85461|
-| Burkina Faso             |             46.83979|
-| Burundi                  |             45.77564|
-| Cambodia                 |             50.28885|
-| Cameroon                 |             49.67085|
-| Canada                   |             75.77951|
-| Central African Republic |             44.92163|
-| Chad                     |             48.42447|
-| Chile                    |             69.76966|
-| China                    |             64.24594|
-| Colombia                 |             66.29904|
-| Comoros                  |             56.08839|
-| Congo, Dem. Rep.         |             45.12370|
-| Congo, Rep.              |             53.71774|
-| Costa Rica               |             73.14528|
-| Cote d'Ivoire            |             49.38504|
-| Croatia                  |             70.24071|
-| Cuba                     |             72.14416|
-| Czech Republic           |             71.58687|
-| Denmark                  |             74.50915|
-| Djibouti                 |             49.95527|
-| Dominican Republic       |             64.63917|
-| Ecuador                  |             66.36373|
-| Egypt                    |             60.11922|
-| El Salvador              |             62.47860|
-| Equatorial Guinea        |             44.59416|
-| Eritrea                  |             48.62670|
-| Ethiopia                 |             46.61236|
-| Finland                  |             73.28337|
-| France                   |             74.79875|
-| Gabon                    |             54.14104|
-| Gambia                   |             49.90655|
-| Germany                  |             73.62700|
-| Ghana                    |             54.68802|
-| Greece                   |             74.17724|
-| Guatemala                |             60.52042|
-| Guinea                   |             46.52832|
-| Guinea-Bissau            |             40.76142|
-| Haiti                    |             52.13651|
-| Honduras                 |             62.24365|
-| Hong Kong, China         |             75.54574|
-| Hungary                  |             69.42664|
-| Iceland                  |             77.09266|
-| India                    |             56.09426|
-| Indonesia                |             57.80601|
-| Iran                     |             62.37336|
-| Iraq                     |             58.28257|
-| Ireland                  |             73.41736|
-| Israel                   |             75.47932|
-| Italy                    |             74.29696|
-| Jamaica                  |             69.53206|
-| Japan                    |             75.61421|
-| Jordan                   |             65.94319|
-| Kenya                    |             54.20441|
-| Korea, Dem. Rep.         |             65.31650|
-| Korea, Rep.              |             67.46982|
-| Kuwait                   |             73.29020|
-| Lebanon                  |             67.12967|
-| Lesotho                  |             50.61360|
-| Liberia                  |             43.18341|
-| Libya                    |             64.83924|
-| Madagascar               |             50.86156|
-| Malawi                   |             45.21549|
-| Malaysia                 |             67.31167|
-| Mali                     |             45.66167|
-| Mauritania               |             55.20500|
-| Mauritius                |             66.45599|
-| Mexico                   |             68.33346|
-| Mongolia                 |             58.88278|
-| Montenegro               |             71.12191|
-| Morocco                  |             61.03082|
-| Mozambique               |             41.62170|
-| Myanmar                  |             55.34716|
-| Namibia                  |             55.01656|
-| Nepal                    |             52.47688|
-| Netherlands              |             75.97093|
-| New Zealand              |             74.64866|
-| Nicaragua                |             62.88380|
-| Niger                    |             47.23346|
-| Nigeria                  |             45.02803|
-| Norway                   |             76.06150|
-| Oman                     |             65.96143|
-| Pakistan                 |             57.89677|
-| Panama                   |             70.02297|
-| Paraguay                 |             68.03501|
-| Peru                     |             62.33680|
-| Philippines              |             63.94656|
-| Poland                   |             70.60218|
-| Portugal                 |             70.80683|
-| Puerto Rico              |             73.42263|
-| Reunion                  |             69.10995|
-| Romania                  |             68.56727|
-| Rwanda                   |             40.99518|
-| Sao Tome and Principe    |             60.06699|
-| Saudi Arabia             |             65.36073|
-| Senegal                  |             54.65331|
-| Serbia                   |             69.12651|
-| Sierra Leone             |             37.95063|
-| Singapore                |             73.48268|
-| Slovak Republic          |             70.99802|
-| Slovenia                 |             71.95397|
-| Somalia                  |             42.56075|
-| South Africa             |             55.15581|
-| Spain                    |             74.76689|
-| Sri Lanka                |             67.69173|
-| Sudan                    |             51.62755|
-| Swaziland                |             49.61324|
-| Sweden                   |             76.38597|
-| Switzerland              |             76.04554|
-| Syria                    |             66.10671|
-| Taiwan                   |             71.94641|
-| Tanzania                 |             49.20349|
-| Thailand                 |             64.15074|
-| Togo                     |             54.42864|
-| Trinidad and Tobago      |             67.34231|
-| Tunisia                  |             64.14539|
-| Turkey                   |             62.66312|
-| Uganda                   |             48.42621|
-| United Kingdom           |             74.08957|
-| United States            |             74.08570|
-| Uruguay                  |             71.15893|
-| Venezuela                |             69.07864|
-| Vietnam                  |             61.66761|
-| West Bank and Gaza       |             64.83924|
-| Yemen, Rep.              |             51.71735|
-| Zambia                   |             45.20961|
-| Zimbabwe                 |             51.95255|
+![](hw03-gapminder-analysis_files/figure-markdown_github/unnamed-chunk-1-1.png)
 
-``` r
-#We use the function as.numeric() to resolve the following error:
-#"integer overflow - use sum(as.numeric(.))"
-```
+This graph helps us see:
+
+-   Most European countries have a high mean life expectancy
+-   Most African countries have a low mean life expectancy
+-   Oceania has exclusively high mean life expectancies
+
+Weighted Mean Life Expectancy by Continent
+------------------------------------------
 
 By Continent, comparing 1952 and 2007:
 
@@ -421,40 +297,77 @@ WMLifeExp1952 <- gapminder %>%
   filter(year == 1952) %>% 
   group_by(continent) %>% 
   mutate(weightedLifeExp = pop * lifeExp) %>% 
-  summarize(MWLifeExp1952 = sum(weightedLifeExp) / sum(pop))
+  summarize(MLifeExp1952 = mean(lifeExp),
+            WMLifeExp1952 = sum(weightedLifeExp) / sum(pop))
 
 WMLifeExp2007 <- gapminder %>% 
   filter(year == 2007) %>% 
   group_by(continent) %>% 
   mutate(weightedLifeExp = pop * lifeExp) %>% 
-  summarize(MWLifeExp2007 = sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))
+  summarize(MLifeExp2007 = mean(lifeExp),
+            WMLifeExp2007 = sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))
 
-inner_join(WMLifeExp1952, WMLifeExp2007)
+kable(inner_join(WMLifeExp1952, WMLifeExp2007, by = "continent"))
 ```
 
-    ## Joining, by = "continent"
+| continent |  MLifeExp1952|  WMLifeExp1952|  MLifeExp2007|  WMLifeExp2007|
+|:----------|-------------:|--------------:|-------------:|--------------:|
+| Africa    |      39.13550|       38.79973|      54.80604|       54.56441|
+| Americas  |      53.27984|       60.23599|      73.60812|       75.35668|
+| Asia      |      46.31439|       42.94114|      70.72848|       69.44386|
+| Europe    |      64.40850|       64.90540|      77.64860|       77.89057|
+| Oceania   |      69.25500|       69.17040|      80.71950|       81.06215|
 
-    ## # A tibble: 5 x 3
-    ##   continent MWLifeExp1952 MWLifeExp2007
-    ##   <fct>             <dbl>         <dbl>
-    ## 1 Africa             38.8          54.6
-    ## 2 Americas           60.2          75.4
-    ## 3 Asia               42.9          69.4
-    ## 4 Europe             64.9          77.9
-    ## 5 Oceania            69.2          81.1
+From this we can contrast the mean life expectancy (MLifeExp----) against the weighted mean life expectancy (WMLifeExp----) by continent. We can see that:
+
+-   Weighted mean life expectancy differs from the mean life expectancy most in the Americas and Asia in 1952.
+    -   For the Americas the weighted mean is higher than the arithmetic mean, indicating that larger countries have longer life expectancies.
+    -   In Asia the weighted mean is less than the arithmetic mean, indicating that the smaller countires have longer life expectancies.
+-   In 2007 the weighted life expectancies differ from the arithmetic means less than in 1952. This may indicate that there are smaller differences in life expectancy between large and small countries.
+
+Note: In this code I used the as.numeric function to resolve the following error:
 
 Error: integer overflow - use sum(as.numeric(.))
 
-How is life expectancy changing over time on different continents?
+I believe this error was generated due to the very large population sizes, especially relative to the life expectancy values.
 
-Report the absolute and/or relative abundance of countries with low life expectancy over time by continent: Compute some measure of worldwide life expectancy - you decide - a mean or median or some other quantile or perhaps your current age. Then determine how many countries on each continent have a life expectancy less than this benchmark, for each year.
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Trimmed mean life by year that removes the top 5 percent and bottom 5 percent values within a continent
+-------------------------------------------------------------------------------------------------------
+
+For this calculation, let's again, just print the results for 1952 and 2007, so things are a bit cleaner
+
+``` r
+gapminder %>% 
+  group_by(continent, year) %>% 
+  summarize(MLifeExp = mean(lifeExp),
+            TMLifeExp = mean(lifeExp, trim = 0.05)) %>% 
+  summarize(MLifeExp1952 = MLifeExp[year == 1952],
+            TMLifeExp1952 = TMLifeExp[year == 1952],
+            MLifeExp2007 = MLifeExp[year == 2007],
+            TMLifeExp2007 = TMLifeExp[year == 2007]) %>% 
+  kable()
+```
+
+| continent |  MLifeExp1952|  TMLifeExp1952|  MLifeExp2007|  TMLifeExp2007|
+|:----------|-------------:|--------------:|-------------:|--------------:|
+| Africa    |      39.13550|       38.98585|      54.80604|       54.53802|
+| Americas  |      53.27984|       53.28987|      73.60812|       73.85365|
+| Asia      |      46.31439|       46.26400|      70.72848|       71.21319|
+| Europe    |      64.40850|       64.85714|      77.64860|       77.71157|
+| Oceania   |      69.25500|       69.25500|      80.71950|       80.71950|
+
+From this we can contrast the mean life expectancy (MLifeExp----) against the trimmed mean life expectancy (TMLifeExp----) by continent. We can see that the the trimmed means do not differ substantially from the arithmetic means for any continent in either 1952 or 2007. This indicates that for the years considered the tails of the distribution of life expectenacies are similar.
+
+Report Countries With Low Life Expectancy Over Time by Continent
+================================================================
+
+Let's explore the absolute and/or relative abundance of countries with low life expectancy over time by continent: Compute some measure of worldwide life expectancy - you decide - a mean or median or some other quantile or perhaps your current age. Then determine how many countries on each continent have a life expectancy less than this benchmark, for each year.
 
 For this exercise, I'm going to exclude the continent of Oceania, as it has a substantially smaller sample size than the other continents, and the minimum life expectancy value observed in Oceania is:
 
 ``` r
 gapminder %>% 
-  filter(continent=="Oceania") %>% 
+  filter(continent == "Oceania") %>% 
   summarize(minLifeExp = min(lifeExp)) %>% 
   kable()
 ```
@@ -465,10 +378,47 @@ gapminder %>%
 
 And we will use 65 as the boundary between low and high life expectancy. If we were to include Oceania, the graphs would be uninformative as both countries in Oceania have had life expectancies greater than 65 for every year reported.
 
-Find countries with interesting stories. Open-ended and, therefore, hard. Promising but unsuccessful attempts are encouraged. This will generate interesting questions to follow up on in class.
+Countries with Life Expectancies Lower than 65 Years
+----------------------------------------------------
 
-How is Oceania doing
---------------------
+``` r
+gapminder %>% 
+  filter(continent != "Oceania") %>% 
+  group_by(continent, year) %>% 
+  summarize(nBelow = sum(lifeExp < 65),
+            pBelow = nBelow / n()) %>% 
+  ggplot(aes(x = year, y = pBelow)) +
+    facet_wrap( ~ continent, scales = "free_x") + 
+    geom_bar(stat = "identity", aes(fill = continent), show.legend = FALSE) +
+    ggtitle("What Poportion of Countries Within A Continent Have Life Expectancies <65y")
+```
+
+![](hw03-gapminder-analysis_files/figure-markdown_github/lifeExpLT65-1.png)
+
+These results aren't terribly surprising. Over time, fewer countries have life expectancies less than 65. A greater proportion of countries had lower life expectancies in Africa and Asia. Let's see if these relationships change if we compare life expectancies to a more dynamic threshold. This time, instead of considering 65 as the boundary between low and high life expectancies, let's try using the annual median life expectancy as the threshold, and then let's see what proportion of each continent's countries fall below the median.
+
+Countries with Life Expectancies Below the Annual Median
+--------------------------------------------------------
+
+``` r
+gapminder %>% 
+  filter(continent != "Oceania") %>% 
+  group_by(year) %>% 
+  mutate(annualMed = median(lifeExp)) %>% 
+  group_by(year, continent) %>% 
+  summarize(nBelow = sum(lifeExp < annualMed),
+            pBelow = nBelow / 70) %>%         #Can divide by 70 as we know there are 70 values below the median
+  ggplot(aes(x = year, y = pBelow)) +
+    geom_bar(stat = "identity", aes(fill = continent)) +
+    ggtitle("What Continents Have Life Expectancies Below the Median Annually")  
+```
+
+![](hw03-gapminder-analysis_files/figure-markdown_github/lifeExpRelMedian-1.png)
+
+This shows that over time, there are no substantial changes in where the countries with lower life expectancy are located. Consistently approximately 65% of countries with life expectancies below the median, are from Africa. The make up of the lower 50% does not change dramatically when considering continents.
+
+How is Oceania Doing
+====================
 
 In the continent of Oceania, there are two countries. Let's see how they compare to each other over time.
 
@@ -476,7 +426,7 @@ First let's build a dataset of just these two countries:
 
 ``` r
 Oceania <- gapminder %>% 
-  filter(continent=="Oceania")
+  filter(continent == "Oceania")
 unique(Oceania$country)
 ```
 
@@ -485,29 +435,81 @@ unique(Oceania$country)
 
 We note that while the dataset Oceania has only data for the countries Australia and New Zealand, the varaible country still contains all 142 levels from the original dataset. This makes sense as country is a factor. Factors require all levels be encoded in the variable, regardless of whether or not they are still present in a new data frame.
 
-### Initial Plots
+Initial Plots
+-------------
 
 ``` r
-OPopVsYear <- ggplot(Oceania, aes(x=year, y=pop)) +
-  # scale_y_log10() +
-  geom_point(aes(colour=country), show.legend=F)
+OPopVsYear <- gapminder %>% 
+  filter(continent == "Oceania") %>% 
+  ggplot(aes(x = year, y = pop)) +
+    geom_point(aes(colour = country), show.legend = F)
 
-OLifeExpVsYear <- ggplot(Oceania, aes(x=year, y=lifeExp)) +
-  # scale_y_log10() +
-  geom_point(aes(colour=country), show.legend=F)
+OLifeExpVsYear <- gapminder %>% 
+  filter(continent == "Oceania") %>%
+  ggplot(aes(x = year, y = lifeExp)) +
+    geom_point(aes(colour = country), show.legend = F)
 
-OGDPPercapVsYear <- ggplot(Oceania, aes(x=year, y=gdpPercap)) +
-  # scale_y_log10() +
-  geom_point(aes(colour=country))
+OGDPPercapVsYear <- gapminder %>% 
+  filter(continent == "Oceania") %>%
+  ggplot(aes(x = year, y = gdpPercap)) +
+    geom_point(aes(colour = country))
 
 grid.arrange(OPopVsYear, OLifeExpVsYear, OGDPPercapVsYear,
-             ncol = 7, nrow = 2, layout_matrix = rbind(c(1,1,2,2,3,3,3), c(1,1,2,2,3,3,3)),
+             ncol = 7, nrow = 2, 
+             layout_matrix = rbind(c(1,1,2,2,3,3,3), c(1,1,2,2,3,3,3)),
              top = "Comparing the Countries of Oceania from 1952-2007")
 ```
 
 ![](hw03-gapminder-analysis_files/figure-markdown_github/OceaniaPlots1-1.png)
 
-### GDP per Capita
+Based on these plots we can see that over time:
 
-Life Expectancy
----------------
+-   Australia started with a bigger population than New Zealand, and has experience faster population growth than New Zealand. Both countries experienced near perfect linear growth from 1952-2007.
+-   Both countries have seen comparable gains in life expectancy from 1952 to 2007. They have not seen perfectly linear increases in life expectancy, nor has one country dominated the other for the duration of the study period.
+-   Australia has seen a greater increase in GDP per capita, that experiences no year to year drops in GDP per capita. New Zealand has also experienced an increase in GDP per capita, but it is less consistent as they have experienced year to year drop.
+
+Let's next explore life expectancy and GDP per capita as they showed variability in the above graphs. Does the variability align between life expectancy and GDP per capita?
+
+Life Expectancy and GDP per Capita
+----------------------------------
+
+Let's see how well life expectany and GDP per Capita are correlated. Let's consider GDP per capita the predictor of life expectancy.
+
+``` r
+gapminder %>% 
+  filter(continent == "Oceania") %>% 
+  ggplot(aes(x = gdpPercap, y = lifeExp, colour = country)) +
+    geom_point(aes(size = year)) +
+    ggtitle("Life Expectancy vs GDP per Capita in Oceania")
+```
+
+![](hw03-gapminder-analysis_files/figure-markdown_github/OceaniaLEvsGDPPC-1.png)
+
+From this we can see that:
+
+-   While life expectancy and GDP per capita are correlated, the relationship is not quite a perfectly linear relationship.
+
+Let's see how the total GDP compares between New Zealand and Australia
+
+Relative GDP Contributions
+--------------------------
+
+``` r
+gapminder %>% 
+  filter(continent == "Oceania") %>% 
+  group_by(year) %>% 
+  mutate(GDP = gdpPercap * pop) %>% 
+  summarize(OceaniaGDP = sum(GDP),
+            AusGDP = GDP[country == "Australia"],
+            NZGDP = GDP[country == "New Zealand"],
+            AusGDPProp = AusGDP / OceaniaGDP,
+            NZGDPProp = NZGDP / OceaniaGDP) %>% 
+  gather(key = "Country", value = "GDPProp", AusGDPProp, NZGDPProp) %>% 
+  ggplot(aes(x = year, y = GDPProp)) +
+    geom_bar(stat = "identity", aes(fill = Country)) +
+    ggtitle("Relative Contributions to the GDP of Oceania")
+```
+
+![](hw03-gapminder-analysis_files/figure-markdown_github/OceaniaGDP-1.png)
+
+This result shouldn't be too surprising, as we've seen that Australia has a much larger population, and a greater GDP per capita than New Zealand!

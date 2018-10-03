@@ -10,6 +10,18 @@ output: github_document
     * [Load Packages](#load-packages)
 * [Get the maximum and minimum of GDP per capita for all continents.](#get-the-maximum-and-minimum-of-gdp-per-capita-for-all-continents)
 * [Computing Alternative Mean Life Expectancy](#computing-alternative-mean-life-expectancy)
+    * [Mean Life Expectancy by Country](#mean-life-expectancy-by-country)
+    * [Weighted Mean Life Expectancy by Continent](#weighted-mean-life-expectancy-by-continent)
+    * [Trimmed mean life by year that removes the top 5% and bottom 5% values within a continent](#trimmed-mean-life-by-year-that-removes-the-top-5-percent-and-bottom-5-percent-values-within-a-continent)
+* [Report Countries With Low Life Expectancy Over Time by Continent](#report-countries-with-low-life-expectancy-over-time-by-continent)
+    * [Countries with Life Expectancies Lower than 65 Years](#countries-with-life-expectancies-lower-than-65-years)
+    * [Countries with Life Expectancies Below the Annual Median](#countries-with-life-expectancies-below-the-annual-median)
+* [How is Oceania Doing?](#how-is-oceania-doing)
+    * [Initial Plots](#initial-plots)
+    * [Life Expectancy and GDP per Capita](#life-expectancy-and-gdp-per-capita)
+    * [Relative GDP Contributions](#relative-gdp-contributions)
+
+
 
 # Introduction
 
@@ -22,6 +34,8 @@ library(tidyverse)
 library(knitr)
 library(gridExtra)
 library(gapminder)
+#Set ggplot titles to be centred
+theme_update(plot.title = element_text(hjust = 0.5))
 ```
 
 # Get the maximum and minimum of GDP per capita for all continents
@@ -30,8 +44,8 @@ library(gapminder)
 gapminder %>% 
   group_by(continent) %>% 
   summarize(minGDPperCap = min(gdpPercap),
-            maxGDPperCap = max(gdpPercap)) %>% 
-  mutate(rangeGDPperCap = maxGDPperCap - minGDPperCap) %>% 
+            maxGDPperCap = max(gdpPercap),
+            rangeGDPperCap = maxGDPperCap - minGDPperCap) %>% 
   knitr::kable()
 ```
 
@@ -41,7 +55,7 @@ To better visualize the spread of the data, we can see:
 
 ```{r maxMinGDPPlot, fig.width=10}
 #Building the below violin plot with jittered points added
-minMaxGDPPlot <- ggplot(gapminder, aes(continent, gdpPercap, colour=year)) +
+minMaxGDPPlot <- ggplot(gapminder, aes(continent, gdpPercap, colour = year)) +
   scale_y_log10() +
   geom_violin() + 
   geom_jitter(alpha=0.5)
@@ -50,11 +64,11 @@ minMaxGDPPlot <- ggplot(gapminder, aes(continent, gdpPercap, colour=year)) +
 minMaxGDPTable <- gapminder %>% 
   group_by(continent) %>% 
   summarize(minGDPperCap = round(min(gdpPercap), 1),
-            maxGDPperCap = round(max(gdpPercap), 1)) %>% 
-  mutate(rangeGDPperCap = maxGDPperCap - minGDPperCap)
+            maxGDPperCap = round(max(gdpPercap), 1),
+            rangeGDPperCap = maxGDPperCap - minGDPperCap)
 
 # Set theme to customize sizing of the table
-tt <- ttheme_default(colhead=list(fg_params = list(parse=TRUE)), 
+tt <- ttheme_default(colhead=list(fg_params = list(parse = TRUE)), 
                      core = list(fg_params=list(cex = 0.75)),
                      colhead = list(fg_params=list(cex = 0.25)),
                      rowhead = list(fg_params=list(cex = 0.25)))
@@ -67,10 +81,15 @@ minMaxGDPTableGrob <- tableGrob(minMaxGDPTable[,c(1:3)],
 # Plot chart and table into one object
 grid.arrange(minMaxGDPTableGrob, minMaxGDPPlot,  
              nrow=2, ncol=4,
-             layout_matrix = rbind(c(1,rep(2,3)), c(1,rep(2,3))),
+             layout_matrix = rbind(c(1, rep(2,3)), c(1, rep(2,3))),
              as.table=TRUE,
              top = "GDP per Capita by Continent")
 ```
+
+This helps us see:
+
+* Contrasting shapes of violin plots: Africa and the Americas are widest in the lower half, while Europe is widest in the upper half of the distribution of GDP values
+* The minimum and maximum values for each continent are not far away from the rest of the data points. This implies that the min and max values are unlikely to be outliers, even if they may be from outlier countries or outlier years
 
 # Computing Alternative Mean Life Expectancy
 
@@ -80,72 +99,138 @@ Let's try three different ways to calculate average life expectancy:
 
 * Mean life expectancy by country, regardless of year
 * Weighted mean that weights life expectancy by population in 1952 and 2007
-* Trimmed mean life by year that removes the top 5% and bottom 5% values
+* Trimmed mean life by year that removes the top 5% and bottom 5% values within a continent
 
 ## Mean Life Expectancy by Country
 
-```{r}
+```{r meanLifeExp}
 gapminder %>% 
   group_by(country) %>% 
   summarize(meanLifeExp = mean(lifeExp)) %>% 
   kable()
 ```
 
-## Weighted Mean Life Expectancy 
-
-By Country: 
+Let's try and visualize these values better:
 
 ```{r}
 gapminder %>% 
-  mutate(weightedLifeExp = lifeExp * pop) %>% 
-  group_by(country) %>% 
-  summarize(MeanWeightedLifeExp = (sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))) %>% 
-  kable()
-#We use the function as.numeric() to resolve the following error:
-#"integer overflow - use sum(as.numeric(.))"
+  group_by(country, continent) %>% 
+  summarize(meanLifeExp = mean(lifeExp)) %>% 
+  ggplot(aes(meanLifeExp)) +
+    geom_histogram(aes(fill = continent), binwidth = 2.5) +
+    ggtitle("Distribution of Country's Mean Life Expectancy by Continent")
 ```
+
+This graph helps us see:
+
+* Most European countries have a high mean life expectancy
+* Most African countries have a low mean life expectancy
+* Oceania has exclusively high mean life expectancies
+
+## Weighted Mean Life Expectancy by Continent
 
 By Continent, comparing 1952 and 2007: 
 
-```{r}
+```{r WMeanLifeExp}
 WMLifeExp1952 <- gapminder %>% 
   filter(year == 1952) %>% 
   group_by(continent) %>% 
   mutate(weightedLifeExp = pop * lifeExp) %>% 
-  summarize(MWLifeExp1952 = sum(weightedLifeExp) / sum(pop))
+  summarize(MLifeExp1952 = mean(lifeExp),
+            WMLifeExp1952 = sum(weightedLifeExp) / sum(pop))
 
 WMLifeExp2007 <- gapminder %>% 
   filter(year == 2007) %>% 
   group_by(continent) %>% 
   mutate(weightedLifeExp = pop * lifeExp) %>% 
-  summarize(MWLifeExp2007 = sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))
+  summarize(MLifeExp2007 = mean(lifeExp),
+            WMLifeExp2007 = sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))
 
-inner_join(WMLifeExp1952, WMLifeExp2007)
-
+kable(inner_join(WMLifeExp1952, WMLifeExp2007, by = "continent"))
 ```
 
+From this we can contrast the mean life expectancy (MLifeExp----) against the weighted mean life expectancy (WMLifeExp----) by continent. We can see that:
+
+* Weighted mean life expectancy differs from the mean life expectancy most in the Americas and Asia in 1952. 
+    * For the Americas the weighted mean is higher than the arithmetic mean, indicating that larger countries have longer life expectancies. 
+    * In Asia the weighted mean is less than the arithmetic mean, indicating that the smaller countires have longer life expectancies.
+* In 2007 the weighted life expectancies differ from the arithmetic means less than in 1952. This may indicate that there are smaller differences in life expectancy between large and small countries.
+
+Note: In this code I used the as.numeric function to resolve the following error:
 
 Error: integer overflow - use sum(as.numeric(.))
 
+I believe this error was generated due to the very large population sizes, especially relative to the life expectancy values. 
 
-How is life expectancy changing over time on different continents?
+## Trimmed mean life by year that removes the top 5 percent and bottom 5 percent values within a continent
 
-## Report the absolute and/or relative abundance of countries with low life expectancy over time by continent: Compute some measure of worldwide life expectancy - you decide - a mean or median or some other quantile or perhaps your current age. Then determine how many countries on each continent have a life expectancy less than this benchmark, for each year.
+For this calculation, let's again, just print the results for 1952 and 2007, so things are a bit cleaner
+
+```{r TMLifeExp}
+gapminder %>% 
+  group_by(continent, year) %>% 
+  summarize(MLifeExp = mean(lifeExp),
+            TMLifeExp = mean(lifeExp, trim = 0.05)) %>% 
+  summarize(MLifeExp1952 = MLifeExp[year == 1952],
+            TMLifeExp1952 = TMLifeExp[year == 1952],
+            MLifeExp2007 = MLifeExp[year == 2007],
+            TMLifeExp2007 = TMLifeExp[year == 2007]) %>% 
+  kable()
+
+```
+
+From this we can contrast the mean life expectancy (MLifeExp----) against the trimmed mean life expectancy (TMLifeExp----) by continent. We can see that the the trimmed means do not differ substantially from the arithmetic means for any continent in either 1952 or 2007. This indicates that for the years considered the tails of the distribution of life expectenacies are similar. 
+
+# Report Countries With Low Life Expectancy Over Time by Continent
+
+Let's explore the absolute and/or relative abundance of countries with low life expectancy over time by continent: Compute some measure of worldwide life expectancy - you decide - a mean or median or some other quantile or perhaps your current age. Then determine how many countries on each continent have a life expectancy less than this benchmark, for each year.
 
 For this exercise, I'm going to exclude the continent of Oceania, as it has a substantially smaller sample size than the other continents, and the minimum life expectancy value observed in Oceania is:
 
 ```{r OceaniaMinLifeExp}
 gapminder %>% 
-  filter(continent=="Oceania") %>% 
+  filter(continent == "Oceania") %>% 
   summarize(minLifeExp = min(lifeExp)) %>% 
   kable()
 ```
 
 And we will use 65 as the boundary between low and high life expectancy. If we were to include Oceania, the graphs would be uninformative as both countries in Oceania have had life expectancies greater than 65 for every year reported. 
 
-Find countries with interesting stories. Open-ended and, therefore, hard. Promising but unsuccessful attempts are encouraged. This will generate interesting questions to follow up on in class.
+## Countries with Life Expectancies Lower than 65 Years
 
-## How is Oceania doing
+```{r lifeExpLT65}
+gapminder %>% 
+  filter(continent != "Oceania") %>% 
+  group_by(continent, year) %>% 
+  summarize(nBelow = sum(lifeExp < 65),
+            pBelow = nBelow / n()) %>% 
+  ggplot(aes(x = year, y = pBelow)) +
+    facet_wrap( ~ continent, scales = "free_x") + 
+    geom_bar(stat = "identity", aes(fill = continent), show.legend = FALSE) +
+    ggtitle("What Poportion of Countries Within A Continent Have Life Expectancies <65y")
+```
+
+These results aren't terribly surprising. Over time, fewer countries have life expectancies less than 65. A greater proportion of countries had lower life expectancies in Africa and Asia. Let's see if these relationships change if we compare life expectancies to a more dynamic threshold. This time, instead of considering 65 as the boundary between low and high life expectancies, let's try using the annual median life expectancy as the threshold, and then let's see what proportion of each continent's countries fall below the median.
+
+## Countries with Life Expectancies Below the Annual Median
+
+```{r lifeExpRelMedian}
+gapminder %>% 
+  filter(continent != "Oceania") %>% 
+  group_by(year) %>% 
+  mutate(annualMed = median(lifeExp)) %>% 
+  group_by(year, continent) %>% 
+  summarize(nBelow = sum(lifeExp < annualMed),
+            pBelow = nBelow / 70) %>%         #Can divide by 70 as we know there are 70 values below the median
+  ggplot(aes(x = year, y = pBelow)) +
+    geom_bar(stat = "identity", aes(fill = continent)) +
+    ggtitle("What Continents Have Life Expectancies Below the Median Annually")  
+
+```
+
+This shows that over time, there are no substantial changes in where the countries with lower life expectancy are located. Consistently approximately 65% of countries with life expectancies below the median, are from Africa. The make up of the lower 50% does not change dramatically when considering continents. 
+
+# How is Oceania Doing
 
 In the continent of Oceania, there are two countries. Let's see how they compare to each other over time.
 
@@ -153,32 +238,78 @@ First let's build a dataset of just these two countries:
 
 ```{r OceaniaNames}
 Oceania <- gapminder %>% 
-  filter(continent=="Oceania")
+  filter(continent == "Oceania")
 unique(Oceania$country)
 ```
 
 We note that while the dataset Oceania has only data for the countries Australia and New Zealand, the varaible country still contains all 142 levels from the original dataset. This makes sense as country is a factor. Factors require all levels be encoded in the variable, regardless of whether or not they are still present in a new data frame. 
 
-### Initial Plots
+## Initial Plots
 
 ```{r OceaniaPlots1, fig.width=10, fig.height=3}
-OPopVsYear <- ggplot(Oceania, aes(x=year, y=pop)) +
-  # scale_y_log10() +
-  geom_point(aes(colour=country), show.legend=F)
+OPopVsYear <- gapminder %>% 
+  filter(continent == "Oceania") %>% 
+  ggplot(aes(x = year, y = pop)) +
+    geom_point(aes(colour = country), show.legend = F)
 
-OLifeExpVsYear <- ggplot(Oceania, aes(x=year, y=lifeExp)) +
-  # scale_y_log10() +
-  geom_point(aes(colour=country), show.legend=F)
+OLifeExpVsYear <- gapminder %>% 
+  filter(continent == "Oceania") %>%
+  ggplot(aes(x = year, y = lifeExp)) +
+    geom_point(aes(colour = country), show.legend = F)
 
-OGDPPercapVsYear <- ggplot(Oceania, aes(x=year, y=gdpPercap)) +
-  # scale_y_log10() +
-  geom_point(aes(colour=country))
+OGDPPercapVsYear <- gapminder %>% 
+  filter(continent == "Oceania") %>%
+  ggplot(aes(x = year, y = gdpPercap)) +
+    geom_point(aes(colour = country))
 
 grid.arrange(OPopVsYear, OLifeExpVsYear, OGDPPercapVsYear,
-             ncol = 7, nrow = 2, layout_matrix = rbind(c(1,1,2,2,3,3,3), c(1,1,2,2,3,3,3)),
+             ncol = 7, nrow = 2, 
+             layout_matrix = rbind(c(1,1,2,2,3,3,3), c(1,1,2,2,3,3,3)),
              top = "Comparing the Countries of Oceania from 1952-2007")
 ```
 
-### GDP per Capita
+Based on these plots we can see that over time:
 
-## Life Expectancy
+* Australia started with a bigger population than New Zealand, and has experience faster population growth than New Zealand. Both countries experienced near perfect linear growth from 1952-2007.
+* Both countries have seen comparable gains in life expectancy from 1952 to 2007. They have not seen perfectly linear increases in life expectancy, nor has one country dominated the other for the duration of the study period.
+* Australia has seen a greater increase in GDP per capita, that experiences no year to year drops in GDP per capita. New Zealand has also experienced an increase in GDP per capita, but it is less consistent as they have experienced year to year drop. 
+
+Let's next explore life expectancy and GDP per capita as they showed variability in the above graphs. Does the variability align between life expectancy and GDP per capita?
+
+## Life Expectancy and GDP per Capita
+
+Let's see how well life expectany and GDP per Capita are correlated. Let's consider GDP per capita the predictor of life expectancy.
+
+```{r OceaniaLEvsGDPPC}
+gapminder %>% 
+  filter(continent == "Oceania") %>% 
+  ggplot(aes(x = gdpPercap, y = lifeExp, colour = country)) +
+    geom_point(aes(size = year)) +
+    ggtitle("Life Expectancy vs GDP per Capita in Oceania")
+```
+
+From this we can see that:
+
+* While life expectancy and GDP per capita are correlated, the relationship is not quite a perfectly linear relationship.
+
+Let's see how the total GDP compares between New Zealand and Australia
+
+## Relative GDP Contributions
+
+```{r OceaniaGDP}
+gapminder %>% 
+  filter(continent == "Oceania") %>% 
+  group_by(year) %>% 
+  mutate(GDP = gdpPercap * pop) %>% 
+  summarize(OceaniaGDP = sum(GDP),
+            AusGDP = GDP[country == "Australia"],
+            NZGDP = GDP[country == "New Zealand"],
+            AusGDPProp = AusGDP / OceaniaGDP,
+            NZGDPProp = NZGDP / OceaniaGDP) %>% 
+  gather(key = "Country", value = "GDPProp", AusGDPProp, NZGDPProp) %>% 
+  ggplot(aes(x = year, y = GDPProp)) +
+    geom_bar(stat = "identity", aes(fill = Country)) +
+    ggtitle("Relative Contributions to the GDP of Oceania")
+```
+
+This result shouldn't be too surprising, as we've seen that Australia has a much larger population, and a greater GDP per capita than New Zealand!
