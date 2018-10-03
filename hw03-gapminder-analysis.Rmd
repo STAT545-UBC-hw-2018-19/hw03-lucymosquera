@@ -69,7 +69,7 @@ minMaxGDPTable <- gapminder %>%
 
 # Set theme to customize sizing of the table
 tt <- ttheme_default(colhead=list(fg_params = list(parse = TRUE)), 
-                     core = list(fg_params=list(cex = 0.75)),
+                     core = list(fg_params=list(cex = 0.75)),         #Adjusting font sizing
                      colhead = list(fg_params=list(cex = 0.25)),
                      rowhead = list(fg_params=list(cex = 0.25)))
 # Converting the data frame/tible into a 'grob' that can be accepted by grid.arrange
@@ -81,7 +81,7 @@ minMaxGDPTableGrob <- tableGrob(minMaxGDPTable[,c(1:3)],
 # Plot chart and table into one object
 grid.arrange(minMaxGDPTableGrob, minMaxGDPPlot,  
              nrow=2, ncol=4,
-             layout_matrix = rbind(c(1, rep(2,3)), c(1, rep(2,3))),
+             layout_matrix = rbind(c(1, rep(2,3)), c(1, rep(2,3))),   #Allowing plots to be unequal sizes
              as.table=TRUE,
              top = "GDP per Capita by Continent")
 ```
@@ -117,7 +117,7 @@ gapminder %>%
   group_by(country, continent) %>% 
   summarize(meanLifeExp = mean(lifeExp)) %>% 
   ggplot(aes(meanLifeExp)) +
-    geom_histogram(aes(fill = continent), binwidth = 2.5) +
+    geom_histogram(aes(fill = continent), binwidth = 2.5) + #Adjusted bin width
     ggtitle("Distribution of Country's Mean Life Expectancy by Continent")
 ```
 
@@ -132,6 +132,7 @@ This graph helps us see:
 By Continent, comparing 1952 and 2007: 
 
 ```{r WMeanLifeExp}
+#Calculating weighted mean life expectancy in 1952
 WMLifeExp1952 <- gapminder %>% 
   filter(year == 1952) %>% 
   group_by(continent) %>% 
@@ -139,6 +140,7 @@ WMLifeExp1952 <- gapminder %>%
   summarize(MLifeExp1952 = mean(lifeExp),
             WMLifeExp1952 = sum(weightedLifeExp) / sum(pop))
 
+#Calculating weighted mean life expectancy in 2007
 WMLifeExp2007 <- gapminder %>% 
   filter(year == 2007) %>% 
   group_by(continent) %>% 
@@ -146,6 +148,7 @@ WMLifeExp2007 <- gapminder %>%
   summarize(MLifeExp2007 = mean(lifeExp),
             WMLifeExp2007 = sum(as.numeric(weightedLifeExp)) / sum(as.numeric(pop)))
 
+#Putting the data from 1952 and 2007 back together
 kable(inner_join(WMLifeExp1952, WMLifeExp2007, by = "continent"))
 ```
 
@@ -170,8 +173,8 @@ For this calculation, let's again, just print the results for 1952 and 2007, so 
 gapminder %>% 
   group_by(continent, year) %>% 
   summarize(MLifeExp = mean(lifeExp),
-            TMLifeExp = mean(lifeExp, trim = 0.05)) %>% 
-  summarize(MLifeExp1952 = MLifeExp[year == 1952],
+            TMLifeExp = mean(lifeExp, trim = 0.05)) %>% #Specifying trim x% of the data (top & bottom)
+  summarize(MLifeExp1952 = MLifeExp[year == 1952],      #Pulling the values for 1952
             TMLifeExp1952 = TMLifeExp[year == 1952],
             MLifeExp2007 = MLifeExp[year == 2007],
             TMLifeExp2007 = TMLifeExp[year == 2007]) %>% 
@@ -202,8 +205,8 @@ And we will use 65 as the boundary between low and high life expectancy. If we w
 gapminder %>% 
   filter(continent != "Oceania") %>% 
   group_by(continent, year) %>% 
-  summarize(nBelow = sum(lifeExp < 65),
-            pBelow = nBelow / n()) %>% 
+  summarize(nBelow = sum(lifeExp < 65),   #Number of countries per continent w lifeExp < 60
+            pBelow = nBelow / n()) %>%    #Percent of countries per continent w lifeExp < 60
   ggplot(aes(x = year, y = pBelow)) +
     facet_wrap( ~ continent, scales = "free_x") + 
     geom_bar(stat = "identity", aes(fill = continent), show.legend = FALSE) +
@@ -302,11 +305,11 @@ gapminder %>%
   group_by(year) %>% 
   mutate(GDP = gdpPercap * pop) %>% 
   summarize(OceaniaGDP = sum(GDP),
-            AusGDP = GDP[country == "Australia"],
-            NZGDP = GDP[country == "New Zealand"],
+            AusGDP = GDP[country == "Australia"],  #Generating the total GDP for Australian rows
+            NZGDP = GDP[country == "New Zealand"], #Generating the total GDP for New Zealand rows
             AusGDPProp = AusGDP / OceaniaGDP,
             NZGDPProp = NZGDP / OceaniaGDP) %>% 
-  gather(key = "Country", value = "GDPProp", AusGDPProp, NZGDPProp) %>% 
+  gather(key = "Country", value = "GDPProp", AusGDPProp, NZGDPProp) %>% #Reshape data for use with geom_bar
   ggplot(aes(x = year, y = GDPProp)) +
     geom_bar(stat = "identity", aes(fill = Country)) +
     ggtitle("Relative Contributions to the GDP of Oceania")
